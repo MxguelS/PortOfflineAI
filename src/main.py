@@ -139,6 +139,31 @@ def send_message(config, messages):
     return result["choices"][0]["message"]["content"]
 
 
+def show_help():
+    """Muestra los comandos disponibles."""
+    console.print()
+    console.print("[bold]Commands[/bold]")
+    console.print()
+    console.print("  /help      Show available commands")
+    console.print("  /clear     Clear conversation history")
+    console.print("  /status    Show PortOfflineAI status")
+    console.print("  /exit      Close PortOfflineAI")
+    console.print()
+
+
+def show_status(config):
+    """Muestra el estado actual de PortOfflineAI."""
+    console.print()
+    console.print("[bold]Status[/bold]")
+    console.print()
+    console.print(f"  Version    {config['app']['version']}")
+    console.print(f"  Model      {config['model']['name']}")
+    console.print("  Backend    CPU")
+    console.print("  Mode       Offline")
+    console.print("  Server     Running")
+    console.print()
+
+
 def chat(config):
     """Interfaz principal de conversación."""
     messages = []
@@ -146,7 +171,7 @@ def chat(config):
     console.rule(style="dim")
     console.print()
     console.print("[bold]Ready[/bold]")
-    console.print("Type [bold]/exit[/bold] to close PortOfflineAI.")
+    console.print("Type [bold]/help[/bold] to see available commands.")
     console.print()
 
     while True:
@@ -157,8 +182,25 @@ def chat(config):
             if not user_input:
                 continue
 
-            if user_input.lower() == "/exit":
+            command = user_input.lower()
+
+            if command == "/exit":
                 break
+
+            if command == "/help":
+                show_help()
+                continue
+
+            if command == "/clear":
+                messages.clear()
+                console.print()
+                console.print("Conversation cleared.")
+                console.print()
+                continue
+
+            if command == "/status":
+                show_status(config)
+                continue
 
             messages.append(
                 {
