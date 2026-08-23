@@ -127,7 +127,7 @@ def send_message(config, messages):
     payload = {
         "model": config["model"]["name"],
         "messages": messages,
-        "max_tokens": 500,
+        "max_tokens": 2048,
     }
 
     request_data = json.dumps(payload).encode("utf-8")
@@ -152,6 +152,7 @@ def send_message(config, messages):
         "completion_tokens": usage.get("completion_tokens", 0),
         "total_tokens": usage.get("total_tokens", 0),
         "tokens_per_second": timings.get("predicted_per_second", 0),
+        "finish_reason": result["choices"][0].get("finish_reason", "unknown"),  
     }
 
     return message, metrics
@@ -249,7 +250,8 @@ def chat(config):
             console.print(
                 f"[dim]Generated in {elapsed_time:.1f}s · "
                 f"{metrics['completion_tokens']} tokens · "
-                f"{metrics['tokens_per_second']:.1f} tok/s[/dim]"
+                f"{metrics['tokens_per_second']:.1f} tok/s · "
+                f"{metrics['finish_reason']}[/dim]"
             )
 
         except urllib.error.URLError as error:
