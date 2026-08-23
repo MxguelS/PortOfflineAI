@@ -1,0 +1,13 @@
+PortOfflineAI Knowledge Test
+
+El Proyecto Girasol utiliza el protocolo AON-47.
+
+Cuando aparece el error FLOW-X92, significa que el sensor principal
+no ha recibido flujo durante más de 35 segundos.
+
+El procedimiento recomendado es:
+
+1. Revisar la alimentación del sensor.
+2. Comprobar el cable de datos.
+3. Reiniciar el controlador.
+4. Volver a ejecutar la prueba de flujo.

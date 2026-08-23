@@ -12,6 +12,9 @@ from rich.status import Status
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "config" / "config.json"
+KNOWLEDGE_DIR = PROJECT_ROOT / "knowledge"
+
+
 console = Console()
 
 def show_header(config):
@@ -168,6 +171,8 @@ def show_help():
     console.print("  /status    Show PortOfflineAI status")
     console.print("  /exit      Close PortOfflineAI")
     console.print()
+    console.print("  /docs      Show available documents")
+
 
 
 def show_status(config):
@@ -182,6 +187,34 @@ def show_status(config):
     console.print("  Server     Running")
     console.print()
 
+
+
+def show_documents():
+    """Muestra los documentos disponibles en knowledge/."""
+    console.print()
+    console.print("[bold]Documents[/bold]")
+    console.print()
+
+    if not KNOWLEDGE_DIR.exists():
+        console.print("  Knowledge directory not found.")
+        console.print()
+        return
+
+    documents = sorted(
+        file
+        for file in KNOWLEDGE_DIR.iterdir()
+        if file.is_file() and file.suffix.lower() in {".txt", ".md"}
+    )
+
+    if not documents:
+        console.print("  No documents available.")
+        console.print()
+        return
+
+    for index, document in enumerate(documents, start=1):
+        console.print(f"  {index}. {document.name}")
+
+    console.print()
 
 def chat(config):
     """Interfaz principal de conversación."""
@@ -220,6 +253,9 @@ def chat(config):
             if command == "/status":
                 show_status(config)
                 continue
+            if command == "/docs":
+                show_documents()
+                continue
 
             messages.append(
                 {
@@ -227,6 +263,9 @@ def chat(config):
                     "content": user_input,
                 }
             )
+
+
+
 
             console.print()
             console.print("[bold]PortOfflineAI[/bold]")
