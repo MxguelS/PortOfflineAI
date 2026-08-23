@@ -73,6 +73,10 @@ def start_server(config, runtime_path, model_path):
         str(port),
         "--reasoning",
         "off",
+        "--parallel",
+        "1",
+        "--ctx-size",
+        "8192",
     ]
 
     process = subprocess.Popen(
@@ -138,7 +142,19 @@ def send_message(config, messages):
     with urllib.request.urlopen(request, timeout=180) as response:
         result = json.loads(response.read().decode("utf-8"))
 
-    return result["choices"][0]["message"]["content"]
+    message = result["choices"][0]["message"]["content"]
+
+    usage = result.get("usage", {})
+    timings = result.get("timings", {})
+
+    metrics = {
+        "prompt_tokens": usage.get("prompt_tokens", 0),
+        "completion_tokens": usage.get("completion_tokens", 0),
+        "total_tokens": usage.get("total_tokens", 0),
+        "tokens_per_second": timings.get("predicted_per_second", 0),
+    }
+
+    return message, metrics
 
 
 def show_help():
@@ -215,7 +231,11 @@ def chat(config):
             console.print("[bold]PortOfflineAI[/bold]")
 
             with console.status("Thinking...", spinner="dots"):
-                response = send_message(config, messages)
+                start_time = time.perf_counter()
+
+                response, metrics = send_message(config, messages)
+
+                elapsed_time = time.perf_counter() - start_time
 
             messages.append(
                 {
@@ -226,6 +246,11 @@ def chat(config):
 
             console.print(Markdown(response))
             console.print()
+            console.print(
+                f"[dim]Generated in {elapsed_time:.1f}s · "
+                f"{metrics['completion_tokens']} tokens · "
+                f"{metrics['tokens_per_second']:.1f} tok/s[/dim]"
+            )
 
         except urllib.error.URLError as error:
             console.print()
