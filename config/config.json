@@ -1,7 +1,7 @@
 {
  "app":{
     "name": "PortOfflineAI",
-    "version": "0.0.1"
+    "version": "0.2.0"
 
  },
  "model":{
@@ -9,6 +9,8 @@
     "path": "/run/media/aonis/Jueguilos/PortOfflineAI/models/Qwen3-4B-Q4_K_M.gguf"
  },
  "runtime":{
-    "path":"runtime/llama.cpp/build/bin/llama-cli"
+    "path":"runtime/llama.cpp/build/bin/llama-server",
+    "host": "127.0.0.1",
+    "port": 8080
  }
 }
