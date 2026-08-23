@@ -26,7 +26,11 @@ class ChatSession:
         self.config = config
         self.messages = []
         self.active_document = None
-        self.active_mode = DEFAULT_MODE
+        configured_mode = config["app"].get("default_mode", DEFAULT_MODE)
+        if mode_exists(configured_mode):
+            self.active_mode = configured_mode
+        else:
+            self.active_mode = DEFAULT_MODE
 
     def clear(self):
         """Limpia el historial de conversación."""
@@ -102,7 +106,8 @@ class ChatSession:
     
 
     def load_document(self, filename):
-        """Carga un documento como contexto."""
+        """Carga un documento local."""
+
         content, error = read_document(filename)
 
         if error:
@@ -116,30 +121,33 @@ class ChatSession:
             "content": content,
         }
 
+        # El nuevo documento inicia un contexto limpio
+        self.messages.clear()
+
         console.print()
-        console.print(
-            f"Loaded document: [bold]{filename}[/bold]"
-        )
+        console.print(f"Loaded document: [bold]{filename}[/bold]")
+        console.print("Conversation history cleared.")
         console.print()
 
     def unload_document(self):
         """Descarga el documento activo."""
+
         if self.active_document is None:
             console.print()
-            console.print(
-                "No document is currently loaded."
-            )
+            console.print("No document is currently loaded.")
             console.print()
             return
 
-        document_name = self.active_document["name"]
+        filename = self.active_document["name"]
+
         self.active_document = None
 
+        # Evita conservar contexto del documento anterior
+        self.messages.clear()
+
         console.print()
-        console.print(
-            f"Unloaded document: "
-            f"[bold]{document_name}[/bold]"
-        )
+        console.print(f"Unloaded document: [bold]{filename}[/bold]")
+        console.print("Conversation history cleared.")
         console.print()
 
     def build_request(self, user_input):

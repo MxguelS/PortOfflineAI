@@ -5,7 +5,46 @@ from src.config import PROJECT_ROOT
 
 KNOWLEDGE_DIR = PROJECT_ROOT / "knowledge"
 MAX_DOCUMENT_SIZE = 32 * 1024
+SUPPORTED_EXTENSIONS = {
+    # Documents
+    ".txt",
+    ".md",
 
+    # Programming
+    ".py",
+    ".java",
+    ".js",
+    ".ts",
+    ".jsx",
+    ".tsx",
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".cs",
+    ".go",
+    ".rs",
+    ".php",
+    ".rb",
+    ".sh",
+
+    # Web
+    ".html",
+    ".css",
+    ".scss",
+
+    # Data / configuration
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".xml",
+    ".sql",
+}
+SUPPORTED_FILENAMES = {
+    "Dockerfile",
+    "Makefile",
+}
 
 def get_documents():
     """Devuelve los documentos disponibles."""
@@ -16,7 +55,7 @@ def get_documents():
         file
         for file in KNOWLEDGE_DIR.iterdir()
         if file.is_file()
-        and file.suffix.lower() in {".txt", ".md"}
+        and file.suffix.lower() in SUPPORTED_EXTENSIONS
     )
 
 
@@ -30,10 +69,10 @@ def read_document(filename):
     if not file_path.is_file():
         return None, f"Not a valid document: {filename}"
 
-    if file_path.suffix.lower() not in {".txt", ".md"}:
+    if file_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
         return (
             None,
-            "Only .txt and .md documents are supported.",
+            f"Unsupported document type: {file_path.suffix}",
         )
 
     try:
@@ -54,3 +93,10 @@ def read_document(filename):
         return None, f"Could not read document: {error}"
 
     return content, None
+
+def is_supported_file(file_path):
+    """Comprueba si un archivo puede cargarse como contexto."""
+    return (
+        file_path.suffix.lower() in SUPPORTED_EXTENSIONS
+        or file_path.name in SUPPORTED_FILENAMES
+    )

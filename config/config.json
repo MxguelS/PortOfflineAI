@@ -1,7 +1,8 @@
 {
  "app":{
     "name": "PortOfflineAI",
-    "version": "0.3.0"
+    "version": "0.3.0",
+    "default_mode": "general"
 
  },
  "model":{
