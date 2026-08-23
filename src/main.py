@@ -238,6 +238,7 @@ def read_document(filename):
 def chat(config):
     """Interfaz principal de conversación."""
     messages = []
+    active_document = None
 
     console.rule(style="dim")
     console.print()
@@ -286,10 +287,47 @@ def chat(config):
                     console.print()
                     continue
 
+                active_document = {
+                    "name": filename,
+                    "content": content,
+                }
+
                 console.print()
                 console.print(f"Loaded document: [bold]{filename}[/bold]")
                 console.print()
                 continue
+
+
+            request_messages = []
+
+            if active_document:
+                request_messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "You have access to the following local document. "
+                            "Use it when it is relevant to answer the user.\n\n"
+                            f"Document: {active_document['name']}\n"
+                            f"Content:\n{active_document['content']}"
+                        ),
+                    }
+                )
+
+            request_messages.extend(messages)
+
+            messages.append(
+                {
+                    "role": "user",
+                    "content": user_input,
+                }
+            )
+
+            request_messages.append(
+                {
+                    "role": "user",
+                    "content": user_input,
+                }
+            )
 
             messages.append(
                 {
@@ -307,7 +345,7 @@ def chat(config):
             with console.status("Thinking...", spinner="dots"):
                 start_time = time.perf_counter()
 
-                response, metrics = send_message(config, messages)
+                response, metrics = send_message(config, request_messages)
 
                 elapsed_time = time.perf_counter() - start_time
 

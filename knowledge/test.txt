@@ -1,13 +1,10 @@
-PortOfflineAI Knowledge Test
+PROYECTO ORION-73
 
-El Proyecto Girasol utiliza el protocolo AON-47.
+El protocolo ORION-73 fue creado exclusivamente para probar
+el sistema Local Knowledge de PortOfflineAI.
 
-Cuando aparece el error FLOW-X92, significa que el sensor principal
-no ha recibido flujo durante más de 35 segundos.
+La contraseña experimental del protocolo es: CAPIBARA-9912.
 
-El procedimiento recomendado es:
+El responsable ficticio del proyecto es Ernesto Pimentón.
 
-1. Revisar la alimentación del sensor.
-2. Comprobar el cable de datos.
-3. Reiniciar el controlador.
-4. Volver a ejecutar la prueba de flujo.
+ORION-73 utiliza un componente imaginario llamado Núcleo Zafiro.
