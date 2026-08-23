@@ -71,6 +71,8 @@ def start_server(config, runtime_path, model_path):
         str(host),
         "--port",
         str(port),
+        "--reasoning",
+        "off",
     ]
 
     process = subprocess.Popen(
