@@ -10,6 +10,13 @@ from src.ui import (
     show_response,
     show_status,
 )
+from src.modes import (
+    DEFAULT_MODE,
+    get_available_modes,
+    get_mode,
+    get_system_prompt,
+    mode_exists,
+)
 
 
 class ChatSession:
@@ -19,6 +26,7 @@ class ChatSession:
         self.config = config
         self.messages = []
         self.active_document = None
+        self.active_mode = DEFAULT_MODE
 
     def clear(self):
         """Limpia el historial de conversación."""
@@ -27,6 +35,71 @@ class ChatSession:
         console.print()
         console.print("Conversation cleared.")
         console.print()
+
+    def show_modes(self):
+        """Muestra el modo actual y los modos disponibles."""
+        modes = get_available_modes()
+
+        console.print()
+        console.print("[bold]Modes[/bold]")
+        console.print()
+
+        for mode_id, mode in modes.items():
+            marker = "*" if mode_id == self.active_mode else " "
+
+            console.print(
+                f" {marker} {mode_id:<10} "
+                f"{mode['name']} - {mode['description']}"
+            )
+
+        console.print()
+        console.print(
+            f"Current mode: "
+            f"[bold]{get_mode(self.active_mode)['name']}[/bold]"
+        )
+        console.print()
+
+
+    def change_mode(self, mode_id):
+        """Cambia el modo activo de la sesión."""
+        mode_id = mode_id.lower().strip()
+
+        if not mode_exists(mode_id):
+            console.print()
+            console.print(
+                f"[bold]Error[/bold]: Unknown mode: {mode_id}"
+            )
+            console.print()
+            console.print(
+                "Use [bold]/mode[/bold] to see available modes."
+            )
+            console.print()
+            return
+
+        if mode_id == self.active_mode:
+            console.print()
+            console.print(
+                f"Mode already active: "
+                f"[bold]{get_mode(mode_id)['name']}[/bold]"
+            )
+            console.print()
+            return
+
+        self.active_mode = mode_id
+
+        # Evitamos mezclar una conversación mantenida bajo
+        # instrucciones de otro modo.
+        self.messages.clear()
+
+        console.print()
+        console.print(
+            f"Mode changed to: "
+            f"[bold]{get_mode(mode_id)['name']}[/bold]"
+        )
+        console.print("Conversation history cleared.")
+        console.print()
+    
+    
 
     def load_document(self, filename):
         """Carga un documento como contexto."""
@@ -71,7 +144,12 @@ class ChatSession:
 
     def build_request(self, user_input):
         """Construye el contexto enviado al modelo."""
-        request_messages = []
+        request_messages = [
+            {
+                "role": "system",
+                "content": get_system_prompt(self.active_mode),
+            }
+        ]
 
         if self.active_document:
             request_messages.append(
@@ -102,42 +180,42 @@ class ChatSession:
         return request_messages
 
     def generate_response(self, request_messages):
-        """Genera y muestra una respuesta."""
-        console.print()
-        console.print("[bold]PortOfflineAI[/bold]")
+            """Genera y muestra una respuesta."""
+            console.print()
+            console.print("[bold]PortOfflineAI[/bold]")
 
-        with console.status(
-            "Thinking...",
-            spinner="dots",
-        ):
-            start_time = time.perf_counter()
+            with console.status(
+                "Thinking...",
+                spinner="dots",
+            ):
+                start_time = time.perf_counter()
 
-            response, metrics = send_message(
-                self.config,
-                request_messages,
+                response, metrics = send_message(
+                    self.config,
+                    request_messages,
+                )
+
+                elapsed_time = (
+                    time.perf_counter() - start_time
+                )
+
+            self.messages.append(
+                {
+                    "role": "assistant",
+                    "content": response,
+                }
             )
 
-            elapsed_time = (
-                time.perf_counter() - start_time
+            show_response(response)
+
+            console.print()
+
+            console.print(
+                f"[dim]Generated in {elapsed_time:.1f}s · "
+                f"{metrics['completion_tokens']} tokens · "
+                f"{metrics['tokens_per_second']:.1f} tok/s · "
+                f"{metrics['finish_reason']}[/dim]"
             )
-
-        self.messages.append(
-            {
-                "role": "assistant",
-                "content": response,
-            }
-        )
-
-        show_response(response)
-
-        console.print()
-
-        console.print(
-            f"[dim]Generated in {elapsed_time:.1f}s · "
-            f"{metrics['completion_tokens']} tokens · "
-            f"{metrics['tokens_per_second']:.1f} tok/s · "
-            f"{metrics['finish_reason']}[/dim]"
-        )
 
     def handle_command(self, user_input):
         """
@@ -165,6 +243,7 @@ class ChatSession:
             show_status(
                 self.config,
                 self.active_document,
+                self.active_mode,
             )
             return True
 
@@ -181,6 +260,30 @@ class ChatSession:
         if command == "/unload":
             self.unload_document()
             return True
+        if command == "/mode":
+            self.show_modes()
+            return True
+
+        if command.startswith("/mode "):
+            mode_id = user_input[6:].strip()
+
+            if not mode_id:
+                self.show_modes()
+                return True
+
+            self.change_mode(mode_id)
+            return True
+        if user_input.startswith("/"):
+            console.print()
+            console.print(
+                f"[bold]Error[/bold]: Unknown command: {user_input}"
+            )
+            console.print(
+                "Use [bold]/help[/bold] to see available commands."
+            )
+            console.print()
+            return True
+
 
         return False
 

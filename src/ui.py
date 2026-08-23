@@ -1,5 +1,6 @@
 from rich.console import Console
 from rich.markdown import Markdown
+from src.modes import get_mode
 
 from src.documents import get_documents
 
@@ -22,7 +23,7 @@ def show_header(config):
     console.print()
     console.print(f"[bold]Model[/bold]      {model_name}")
     console.print("[bold]Backend[/bold]    CPU")
-    console.print("[bold]Mode[/bold]       Offline")
+    console.print("[bold]Connectivity[/bold]  Offline")
     console.print()
 
 
@@ -39,28 +40,33 @@ def show_help():
     console.print("  /read <file>    Load a local document")
     console.print("  /unload         Unload active document")
     console.print("  /exit           Close PortOfflineAI")
+    console.print("  /mode           Show available modes")
+    console.print("  /mode <mode>    Change active mode")
 
     console.print()
 
 
-def show_status(config, active_document):
+def show_status(config, active_document, active_mode):
     """Muestra el estado de PortOfflineAI."""
     console.print()
     console.print("[bold]Status[/bold]")
     console.print()
 
-    console.print(f"  Version     {config['app']['version']}")
-    console.print(f"  Model       {config['model']['name']}")
-    console.print("  Backend     CPU")
-    console.print("  Mode        Offline")
-    console.print("  Server      Running")
+    console.print(f"  Version       {config['app']['version']}")
+    console.print(f"  Model         {config['model']['name']}")
+    console.print("  Backend       CPU")
+    console.print("  Connectivity  Offline")
+    mode = get_mode(active_mode)
+    mode_name = mode["name"] if mode else active_mode
+    console.print(f"  AI Mode       {mode_name}")
+    console.print("  Server        Running")
 
     if active_document:
         console.print(
-            f"  Document    {active_document['name']}"
+            f"  Document      {active_document['name']}"
         )
     else:
-        console.print("  Document    None")
+        console.print("  Document      None")
 
     console.print()
 
