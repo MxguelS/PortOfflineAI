@@ -180,18 +180,23 @@ def show_help():
     console.print()
 
 
-def show_status(config):
+def show_status(config, active_document):
     """Muestra el estado actual de PortOfflineAI."""
     console.print()
     console.print("[bold]Status[/bold]")
     console.print()
-    console.print(f"  Version    {config['app']['version']}")
-    console.print(f"  Model      {config['model']['name']}")
-    console.print("  Backend    CPU")
-    console.print("  Mode       Offline")
-    console.print("  Server     Running")
-    console.print()
+    console.print(f"  Version     {config['app']['version']}")
+    console.print(f"  Model       {config['model']['name']}")
+    console.print("  Backend     CPU")
+    console.print("  Mode        Offline")
+    console.print("  Server      Running")
 
+    if active_document:
+        console.print(f"  Document    {active_document['name']}")
+    else:
+        console.print("  Document    None")
+
+    console.print()
 
 def show_documents():
     """Muestra los documentos disponibles en knowledge/."""
@@ -288,7 +293,7 @@ def chat(config):
                 continue
 
             if command == "/status":
-                show_status(config)
+                show_status(config, active_document)
                 continue
 
             if command == "/docs":
