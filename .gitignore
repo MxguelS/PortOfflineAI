@@ -1,0 +1,18 @@
+#Modelos IA
+models/
+
+# llama.cpp clonado/copilado
+runtime/llama.cpp
+
+# pyton
+__pycache__/
+*.pyc
+.venv/
+venvn.
+
+# Logs y temporales
+*.log
+temp/
+
+#editor
+.vscode/
