@@ -1,0 +1,14 @@
+{
+ "app":{
+    "name": "PortOfflineAI",
+    "version": "0.0.1"
+
+ },
+ "model":{
+    "name": "Qwen3-4B Q4_K_M",
+    "path": "/run/media/aonis/Jueguilos/PortOfflineAI/models/Qwen3-4B-Q4_K_M.gguf"
+ },
+ "runtime":{
+    "path":"runtime/llama.cpp/build/bin/llama-cli"
+ }
+}
