@@ -19,4 +19,4 @@ if [ ! -f "$VENV_PYTHON" ]; then
 fi
 
 # Iniciar PortOfflineAI usando su entorno
-exec "$VENV_PYTHON" src/main.py
+exec "$VENV_PYTHON" -m src.main
