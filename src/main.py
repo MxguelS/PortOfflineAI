@@ -5,17 +5,17 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.status import Status
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "config" / "config.json"
 KNOWLEDGE_DIR = PROJECT_ROOT / "knowledge"
 
-
 console = Console()
+
 
 def show_header(config):
     """Muestra la cabecera principal de PortOfflineAI."""
@@ -24,7 +24,9 @@ def show_header(config):
     model_name = config["model"]["name"]
 
     console.print()
-    console.print(f"[bold]{app_name}[/bold]                                      v{version}")
+    console.print(
+        f"[bold]{app_name}[/bold]                                      v{version}"
+    )
     console.rule(style="dim")
     console.print()
     console.print(f"[bold]Model[/bold]      {model_name}")
@@ -36,7 +38,7 @@ def show_header(config):
 def load_config():
     """Carga la configuración de PortOfflineAI."""
     if not CONFIG_PATH.exists():
-        print(f"Error: no se encontró {CONFIG_PATH}")
+        console.print(f"Error: no se encontró {CONFIG_PATH}")
         sys.exit(1)
 
     with CONFIG_PATH.open("r", encoding="utf-8") as file:
@@ -49,13 +51,13 @@ def validate_files(config):
     model_path = PROJECT_ROOT / config["model"]["path"]
 
     if not runtime_path.exists():
-        print("Error: no se encontró llama-server.")
-        print(f"Ruta esperada: {runtime_path}")
+        console.print("Error: no se encontró llama-server.")
+        console.print(f"Ruta esperada: {runtime_path}")
         sys.exit(1)
 
     if not model_path.exists():
-        print("Error: no se encontró el modelo.")
-        print(f"Ruta esperada: {model_path}")
+        console.print("Error: no se encontró el modelo.")
+        console.print(f"Ruta esperada: {model_path}")
         sys.exit(1)
 
     return runtime_path, model_path
@@ -83,10 +85,10 @@ def start_server(config, runtime_path, model_path):
     ]
 
     process = subprocess.Popen(
-    command,
-    cwd=PROJECT_ROOT,
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
+        command,
+        cwd=PROJECT_ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
 
     return process
@@ -96,12 +98,11 @@ def wait_for_server(config, process, timeout=180):
     """Espera hasta que llama-server indique que está listo."""
     host = config["runtime"]["host"]
     port = config["runtime"]["port"]
-    health_url = f"http://{host}:{port}/health"
 
+    health_url = f"http://{host}:{port}/health"
     start_time = time.time()
 
     while time.time() - start_time < timeout:
-        # Si llama-server murió durante la carga
         if process.poll() is not None:
             return False
 
@@ -155,7 +156,10 @@ def send_message(config, messages):
         "completion_tokens": usage.get("completion_tokens", 0),
         "total_tokens": usage.get("total_tokens", 0),
         "tokens_per_second": timings.get("predicted_per_second", 0),
-        "finish_reason": result["choices"][0].get("finish_reason", "unknown"),  
+        "finish_reason": result["choices"][0].get(
+            "finish_reason",
+            "unknown",
+        ),
     }
 
     return message, metrics
@@ -163,13 +167,17 @@ def send_message(config, messages):
 
 def show_help():
     """Muestra los comandos disponibles."""
+    console.print()
+    console.print("[bold]Commands[/bold]")
+    console.print()
     console.print("  /help           Show available commands")
     console.print("  /clear          Clear conversation history")
     console.print("  /status         Show PortOfflineAI status")
     console.print("  /docs           Show available documents")
     console.print("  /read <file>    Load a local document")
+    console.print("  /unload         Unload active document")
     console.print("  /exit           Close PortOfflineAI")
-
+    console.print()
 
 
 def show_status(config):
@@ -183,7 +191,6 @@ def show_status(config):
     console.print("  Mode       Offline")
     console.print("  Server     Running")
     console.print()
-
 
 
 def show_documents():
@@ -200,7 +207,8 @@ def show_documents():
     documents = sorted(
         file
         for file in KNOWLEDGE_DIR.iterdir()
-        if file.is_file() and file.suffix.lower() in {".txt", ".md"}
+        if file.is_file()
+        and file.suffix.lower() in {".txt", ".md"}
     )
 
     if not documents:
@@ -216,7 +224,6 @@ def show_documents():
 
 def read_document(filename):
     """Lee un documento desde knowledge/."""
-
     file_path = KNOWLEDGE_DIR / filename
 
     if not file_path.exists():
@@ -230,10 +237,12 @@ def read_document(filename):
 
     try:
         content = file_path.read_text(encoding="utf-8")
+
     except (OSError, UnicodeDecodeError) as error:
         return None, f"Could not read document: {error}"
 
     return content, None
+
 
 def chat(config):
     """Interfaz principal de conversación."""
@@ -243,7 +252,9 @@ def chat(config):
     console.rule(style="dim")
     console.print()
     console.print("[bold]Ready[/bold]")
-    console.print("Type [bold]/help[/bold] to see available commands.")
+    console.print(
+        "Type [bold]/help[/bold] to see available commands."
+    )
     console.print()
 
     while True:
@@ -256,6 +267,10 @@ def chat(config):
 
             command = user_input.lower()
 
+            # -------------------------
+            # Comandos internos
+            # -------------------------
+
             if command == "/exit":
                 break
 
@@ -265,17 +280,21 @@ def chat(config):
 
             if command == "/clear":
                 messages.clear()
+
                 console.print()
                 console.print("Conversation cleared.")
                 console.print()
+
                 continue
 
             if command == "/status":
                 show_status(config)
                 continue
+
             if command == "/docs":
                 show_documents()
                 continue
+
             if command.startswith("/read "):
                 filename = user_input[6:].strip()
 
@@ -283,7 +302,9 @@ def chat(config):
 
                 if error:
                     console.print()
-                    console.print(f"[bold]Error[/bold]: {error}")
+                    console.print(
+                        f"[bold]Error[/bold]: {error}"
+                    )
                     console.print()
                     continue
 
@@ -293,10 +314,37 @@ def chat(config):
                 }
 
                 console.print()
-                console.print(f"Loaded document: [bold]{filename}[/bold]")
+                console.print(
+                    f"Loaded document: [bold]{filename}[/bold]"
+                )
                 console.print()
+
                 continue
 
+            if command == "/unload":
+                if active_document is None:
+                    console.print()
+                    console.print(
+                        "No document is currently loaded."
+                    )
+                    console.print()
+                    continue
+
+                document_name = active_document["name"]
+                active_document = None
+
+                console.print()
+                console.print(
+                    f"Unloaded document: "
+                    f"[bold]{document_name}[/bold]"
+                )
+                console.print()
+
+                continue
+
+            # -------------------------
+            # Construcción del contexto
+            # -------------------------
 
             request_messages = []
 
@@ -305,50 +353,52 @@ def chat(config):
                     {
                         "role": "system",
                         "content": (
-                            "You have access to the following local document. "
-                            "Use it when it is relevant to answer the user.\n\n"
-                            f"Document: {active_document['name']}\n"
-                            f"Content:\n{active_document['content']}"
+                            "You have access to the following "
+                            "local document. Use it when it is "
+                            "relevant to answer the user.\n\n"
+                            f"Document: "
+                            f"{active_document['name']}\n"
+                            f"Content:\n"
+                            f"{active_document['content']}"
                         ),
                     }
                 )
 
+            # Historial anterior
             request_messages.extend(messages)
 
-            messages.append(
-                {
-                    "role": "user",
-                    "content": user_input,
-                }
-            )
+            # Mensaje actual
+            user_message = {
+                "role": "user",
+                "content": user_input,
+            }
 
-            request_messages.append(
-                {
-                    "role": "user",
-                    "content": user_input,
-                }
-            )
+            messages.append(user_message)
+            request_messages.append(user_message)
 
-            messages.append(
-                {
-                    "role": "user",
-                    "content": user_input,
-                }
-            )
-
-
-
+            # -------------------------
+            # Generación
+            # -------------------------
 
             console.print()
             console.print("[bold]PortOfflineAI[/bold]")
 
-            with console.status("Thinking...", spinner="dots"):
+            with console.status(
+                "Thinking...",
+                spinner="dots",
+            ):
                 start_time = time.perf_counter()
 
-                response, metrics = send_message(config, request_messages)
+                response, metrics = send_message(
+                    config,
+                    request_messages,
+                )
 
-                elapsed_time = time.perf_counter() - start_time
+                elapsed_time = (
+                    time.perf_counter() - start_time
+                )
 
+            # Guardar respuesta en historial
             messages.append(
                 {
                     "role": "assistant",
@@ -356,8 +406,10 @@ def chat(config):
                 }
             )
 
+            # Mostrar respuesta
             console.print(Markdown(response))
             console.print()
+
             console.print(
                 f"[dim]Generated in {elapsed_time:.1f}s · "
                 f"{metrics['completion_tokens']} tokens · "
@@ -367,7 +419,9 @@ def chat(config):
 
         except urllib.error.URLError as error:
             console.print()
-            console.print(f"Error communicating with the model: {error}")
+            console.print(
+                f"Error communicating with the model: {error}"
+            )
             console.print()
 
 
@@ -381,15 +435,23 @@ def main():
     server_process = None
 
     try:
-        with console.status("Loading model...", spinner="dots"):
+        with console.status(
+            "Loading model...",
+            spinner="dots",
+        ):
             server_process = start_server(
                 config,
                 runtime_path,
                 model_path,
             )
 
-            if not wait_for_server(config, server_process):
-                console.print("Error: llama-server could not start.")
+            if not wait_for_server(
+                config,
+                server_process,
+            ):
+                console.print(
+                    "Error: llama-server could not start."
+                )
                 sys.exit(1)
 
         chat(config)
@@ -401,11 +463,15 @@ def main():
         console.print()
         console.print("Closing PortOfflineAI...")
 
-        if server_process is not None and server_process.poll() is None:
+        if (
+            server_process is not None
+            and server_process.poll() is None
+        ):
             server_process.terminate()
 
             try:
                 server_process.wait(timeout=10)
+
             except subprocess.TimeoutExpired:
                 server_process.kill()
 
