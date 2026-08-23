@@ -5,10 +5,29 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.status import Status
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "config" / "config.json"
+console = Console()
+
+def show_header(config):
+    """Muestra la cabecera principal de PortOfflineAI."""
+    app_name = config["app"]["name"]
+    version = config["app"]["version"]
+    model_name = config["model"]["name"]
+
+    console.print()
+    console.print(f"[bold]{app_name}[/bold]                                      v{version}")
+    console.rule(style="dim")
+    console.print()
+    console.print(f"[bold]Model[/bold]      {model_name}")
+    console.print("[bold]Backend[/bold]    CPU")
+    console.print("[bold]Mode[/bold]       Offline")
+    console.print()
 
 
 def load_config():
@@ -124,14 +143,16 @@ def chat(config):
     """Interfaz principal de conversación."""
     messages = []
 
-    print()
-    print("PortOfflineAI listo.")
-    print("Escribe /exit para salir.")
-    print()
+    console.rule(style="dim")
+    console.print()
+    console.print("[bold]Ready[/bold]")
+    console.print("Type [bold]/exit[/bold] to close PortOfflineAI.")
+    console.print()
 
     while True:
         try:
-            user_input = input("> ").strip()
+            console.print("[bold]You[/bold]")
+            user_input = console.input("❯ ").strip()
 
             if not user_input:
                 continue
@@ -146,10 +167,11 @@ def chat(config):
                 }
             )
 
-            print()
-            print("Pensando...")
+            console.print()
+            console.print("[bold]PortOfflineAI[/bold]")
 
-            response = send_message(config, messages)
+            with console.status("Thinking...", spinner="dots"):
+                response = send_message(config, messages)
 
             messages.append(
                 {
@@ -158,57 +180,46 @@ def chat(config):
                 }
             )
 
-            print()
-            print(response)
-            print()
+            console.print(Markdown(response))
+            console.print()
 
         except urllib.error.URLError as error:
-            print()
-            print(f"Error comunicándose con el modelo: {error}")
-            print()
+            console.print()
+            console.print(f"Error communicating with the model: {error}")
+            console.print()
 
 
 def main():
     config = load_config()
 
-    app_name = config["app"]["name"]
-    version = config["app"]["version"]
-    model_name = config["model"]["name"]
-
-    print("=" * 40)
-    print(f"       {app_name} v{version}")
-    print("=" * 40)
-    print()
-    print(f"Modelo: {model_name}")
-    print("Modo: Offline")
-    print("Backend: CPU")
-    print()
+    show_header(config)
 
     runtime_path, model_path = validate_files(config)
 
-    print("Cargando modelo...")
-
-    server_process = start_server(
-        config,
-        runtime_path,
-        model_path,
-    )
+    server_process = None
 
     try:
-        if not wait_for_server(config, server_process):
-            print("Error: llama-server no pudo iniciarse.")
-            server_process.terminate()
-            sys.exit(1)
+        with console.status("Loading model...", spinner="dots"):
+            server_process = start_server(
+                config,
+                runtime_path,
+                model_path,
+            )
+
+            if not wait_for_server(config, server_process):
+                console.print("Error: llama-server could not start.")
+                sys.exit(1)
 
         chat(config)
 
     except KeyboardInterrupt:
-        print()
+        console.print()
 
     finally:
-        print("Cerrando PortOfflineAI...")
+        console.print()
+        console.print("Closing PortOfflineAI...")
 
-        if server_process.poll() is None:
+        if server_process is not None and server_process.poll() is None:
             server_process.terminate()
 
             try:
@@ -216,7 +227,7 @@ def main():
             except subprocess.TimeoutExpired:
                 server_process.kill()
 
-        print("PortOfflineAI cerrado.")
+        console.print("PortOfflineAI closed.")
 
 
 if __name__ == "__main__":
