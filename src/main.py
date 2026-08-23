@@ -163,15 +163,12 @@ def send_message(config, messages):
 
 def show_help():
     """Muestra los comandos disponibles."""
-    console.print()
-    console.print("[bold]Commands[/bold]")
-    console.print()
-    console.print("  /help      Show available commands")
-    console.print("  /clear     Clear conversation history")
-    console.print("  /status    Show PortOfflineAI status")
-    console.print("  /exit      Close PortOfflineAI")
-    console.print()
-    console.print("  /docs      Show available documents")
+    console.print("  /help           Show available commands")
+    console.print("  /clear          Clear conversation history")
+    console.print("  /status         Show PortOfflineAI status")
+    console.print("  /docs           Show available documents")
+    console.print("  /read <file>    Load a local document")
+    console.print("  /exit           Close PortOfflineAI")
 
 
 
@@ -216,6 +213,28 @@ def show_documents():
 
     console.print()
 
+
+def read_document(filename):
+    """Lee un documento desde knowledge/."""
+
+    file_path = KNOWLEDGE_DIR / filename
+
+    if not file_path.exists():
+        return None, f"Document not found: {filename}"
+
+    if not file_path.is_file():
+        return None, f"Not a valid document: {filename}"
+
+    if file_path.suffix.lower() not in {".txt", ".md"}:
+        return None, "Only .txt and .md documents are supported."
+
+    try:
+        content = file_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        return None, f"Could not read document: {error}"
+
+    return content, None
+
 def chat(config):
     """Interfaz principal de conversación."""
     messages = []
@@ -255,6 +274,21 @@ def chat(config):
                 continue
             if command == "/docs":
                 show_documents()
+                continue
+            if command.startswith("/read "):
+                filename = user_input[6:].strip()
+
+                content, error = read_document(filename)
+
+                if error:
+                    console.print()
+                    console.print(f"[bold]Error[/bold]: {error}")
+                    console.print()
+                    continue
+
+                console.print()
+                console.print(f"Loaded document: [bold]{filename}[/bold]")
+                console.print()
                 continue
 
             messages.append(
