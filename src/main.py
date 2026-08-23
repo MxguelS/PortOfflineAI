@@ -13,6 +13,7 @@ from rich.markdown import Markdown
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "config" / "config.json"
 KNOWLEDGE_DIR = PROJECT_ROOT / "knowledge"
+MAX_DOCUMENT_SIZE = 32 * 1024  # 32 KB
 
 console = Console()
 
@@ -241,13 +242,22 @@ def read_document(filename):
         return None, "Only .txt and .md documents are supported."
 
     try:
+        file_size = file_path.stat().st_size
+
+        if file_size > MAX_DOCUMENT_SIZE:
+            max_kb = MAX_DOCUMENT_SIZE // 1024
+
+            return None, (
+                f"Document is too large. "
+                f"Maximum supported size is {max_kb} KB."
+            )
+
         content = file_path.read_text(encoding="utf-8")
 
     except (OSError, UnicodeDecodeError) as error:
         return None, f"Could not read document: {error}"
 
     return content, None
-
 
 def chat(config):
     """Interfaz principal de conversación."""
