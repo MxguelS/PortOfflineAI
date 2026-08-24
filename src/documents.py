@@ -54,8 +54,7 @@ def get_documents():
     return sorted(
         file
         for file in KNOWLEDGE_DIR.iterdir()
-        if file.is_file()
-        and file.suffix.lower() in SUPPORTED_EXTENSIONS
+        if file.is_file() and is_supported_file(file)
     )
 
 
@@ -69,7 +68,7 @@ def read_document(filename):
     if not file_path.is_file():
         return None, f"Not a valid document: {filename}"
 
-    if file_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+    if not is_supported_file(file_path):
         return (
             None,
             f"Unsupported document type: {file_path.suffix}",
