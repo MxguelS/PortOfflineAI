@@ -42,6 +42,14 @@ def show_help():
     console.print("  /exit           Close PortOfflineAI")
     console.print("  /mode           Show available modes")
     console.print("  /mode <mode>    Change active mode")
+    console.print("  /project <path>   Load a local project")
+    console.print("  /project          Show active project")
+    console.print("  /project unload   Unload active project")
+    console.print("  /files            Show project files")
+    console.print("  /context              Show context files")
+    console.print("  /context add <file>   Add file to context")
+    console.print("  /context remove <file> Remove file from context")
+    console.print("  /context clear        Clear context files")
 
     console.print()
 
