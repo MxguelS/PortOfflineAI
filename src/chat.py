@@ -23,9 +23,9 @@ from src.modes import (
     mode_exists,
 )
 from src.chunking import (
-    chunk_python_file,
-    select_global_chunks,
+    chunk_code_file,
     get_dependency_context,
+    select_global_chunks,
 )
 
 
@@ -517,19 +517,18 @@ class ChatSession:
 
             file_contents[file["name"]] = content
 
-            if file_path.suffix.lower() == ".py":
-                chunks, error = chunk_python_file(
-                    file_path
-                )
+            chunks, error = chunk_code_file(
+                file_path
+            )
 
-                if not error and chunks:
-                    file_chunks.append(
-                        (
-                            file["name"],
-                            chunks,
-                        )
+            if not error and chunks:
+                file_chunks.append(
+                    (
+                        file["name"],
+                        chunks,
                     )
-                    continue
+                )
+                continue
 
             fallback_files.append(file)
 
@@ -657,7 +656,7 @@ class ChatSession:
             context_parts.append(part)
             total_size += part_size
             selected_count += 1
-            
+
         return "\n\n---\n\n".join(
             context_parts
         )

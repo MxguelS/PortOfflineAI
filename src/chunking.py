@@ -5,6 +5,11 @@ from pathlib import Path
 import re
 import textwrap
 
+from src.tree_parser import (
+    extract_code_chunks,
+    get_language_for_file,
+)
+
 STOP_WORDS = {
     "a",
     "al",
@@ -333,30 +338,522 @@ def _build_chunk(
         ),
     }
 
+def _find_matching_brace(lines, start_index):
+    """
+    Busca la llave de cierre correspondiente a un bloque.
+
+    Retorna el índice de la línea donde termina el bloque.
+    """
+
+    depth = 0
+    found_opening = False
+
+    for index in range(start_index, len(lines)):
+        line = lines[index]
+
+        for char in line:
+            if char == "{":
+                depth += 1
+                found_opening = True
+
+            elif char == "}":
+                depth -= 1
+
+                if found_opening and depth == 0:
+                    return index
+
+    return None
+
+def _build_generic_chunk(
+    name,
+    chunk_type,
+    lines,
+    start_index,
+    end_index,
+):
+    """Construye un chunk para código no-Python."""
+
+    content = "\n".join(
+        lines[start_index:end_index + 1]
+    )
+
+    return {
+        "name": name,
+        "type": chunk_type,
+        "start_line": start_index + 1,
+        "end_line": end_index + 1,
+        "content": content,
+        "size": len(
+            content.encode("utf-8")
+        ),
+    }
+
+
+def _chunk_java_file(lines):
+    """
+    Detecta clases y métodos Java de forma básica.
+
+    Si no encuentra estructuras reconocibles,
+    retorna una lista vacía para permitir fallback.
+    """
+
+    chunks = []
+
+    class_pattern = re.compile(
+        r"\b(?:class|interface|enum|record)\s+"
+        r"([A-Za-z_][A-Za-z0-9_]*)"
+    )
+
+    method_pattern = re.compile(
+        r"""
+        ^\s*
+        (?:
+            public|protected|private|static|final|
+            abstract|synchronized|native|strictfp|
+            default
+        )*
+        \s*
+        (?:<[^>]+>\s*)?
+        [A-Za-z_][A-Za-z0-9_<>\[\],.? ]*
+        \s+
+        ([A-Za-z_][A-Za-z0-9_]*)
+        \s*
+        \([^;]*\)
+        \s*
+        (?:throws\s+[^{]+)?
+        \{
+        """,
+        re.VERBOSE,
+    )
+
+    current_class = None
+
+    for index, line in enumerate(lines):
+        class_match = class_pattern.search(line)
+
+        if class_match:
+            current_class = class_match.group(1)
+
+        method_match = method_pattern.search(line)
+
+        if not method_match:
+            continue
+
+        method_name = method_match.group(1)
+
+        if method_name in {
+            "if",
+            "for",
+            "while",
+            "switch",
+            "catch",
+        }:
+            continue
+
+        end_index = _find_matching_brace(
+            lines,
+            index,
+        )
+
+        if end_index is None:
+            continue
+
+        if current_class:
+            chunk_name = (
+                f"{current_class}.{method_name}"
+            )
+        else:
+            chunk_name = method_name
+
+        chunks.append(
+            _build_generic_chunk(
+                chunk_name,
+                "method",
+                lines,
+                index,
+                end_index,
+            )
+        )
+
+    return chunks
+
+def _chunk_javascript_file(lines):
+    """
+    Detecta funciones y métodos comunes en
+    JavaScript y TypeScript.
+
+    Si no encuentra estructuras reconocibles,
+    retorna una lista vacía para permitir fallback.
+    """
+
+    chunks = []
+
+    class_pattern = re.compile(
+        r"\bclass\s+"
+        r"([A-Za-z_$][A-Za-z0-9_$]*)"
+    )
+
+    function_pattern = re.compile(
+        r"""
+        ^\s*
+        (?:export\s+)?
+        (?:default\s+)?
+        (?:async\s+)?
+        function\s+
+        ([A-Za-z_$][A-Za-z0-9_$]*)
+        \s*
+        (?:<[^>]+>)?
+        \s*
+        \([^)]*\)
+        (?:\s*:\s*[^{]+)?
+        \s*
+        \{
+        """,
+        re.VERBOSE,
+    )
+
+    arrow_pattern = re.compile(
+        r"""
+        ^\s*
+        (?:export\s+)?
+        (?:const|let|var)
+        \s+
+        ([A-Za-z_$][A-Za-z0-9_$]*)
+        \s*
+        (?::[^=]+)?
+        =
+        \s*
+        (?:async\s*)?
+        (?:\([^)]*\)|[A-Za-z_$][A-Za-z0-9_$]*)
+        \s*
+        (?:\:\s*[^=]+)?
+        =>
+        \s*
+        \{
+        """,
+        re.VERBOSE,
+    )
+
+    function_expression_pattern = re.compile(
+        r"""
+        ^\s*
+        (?:export\s+)?
+        (?:const|let|var)
+        \s+
+        ([A-Za-z_$][A-Za-z0-9_$]*)
+        \s*
+        (?::[^=]+)?
+        =
+        \s*
+        (?:async\s+)?
+        function
+        (?:\s+[A-Za-z_$][A-Za-z0-9_$]*)?
+        \s*
+        \([^)]*\)
+        (?:\s*:\s*[^{]+)?
+        \s*
+        \{
+        """,
+        re.VERBOSE,
+    )
+
+    method_pattern = re.compile(
+        r"""
+        ^\s*
+        (?:
+            public|private|protected|static|
+            readonly|abstract|override
+        )*
+        \s*
+        (?:async\s+)?
+        ([A-Za-z_$][A-Za-z0-9_$]*)
+        \s*
+        (?:<[^>]+>)?
+        \s*
+        \([^)]*\)
+        (?:\s*:\s*[^{]+)?
+        \s*
+        \{
+        """,
+        re.VERBOSE,
+    )
+
+    current_class = None
+    class_end = -1
+
+    for index, line in enumerate(lines):
+        if (
+            current_class is not None
+            and index > class_end
+        ):
+            current_class = None
+            class_end = -1
+
+        class_match = class_pattern.search(line)
+
+        if class_match:
+            current_class = class_match.group(1)
+
+            detected_end = _find_matching_brace(
+                lines,
+                index,
+            )
+
+            if detected_end is not None:
+                class_end = detected_end
+
+        match = function_pattern.search(line)
+        chunk_type = "function"
+
+        if not match:
+            match = arrow_pattern.search(line)
+
+        if not match:
+            match = function_expression_pattern.search(
+                line
+            )
+
+        if not match and current_class:
+            match = method_pattern.search(line)
+
+            if match:
+                chunk_type = "method"
+
+        if not match:
+            continue
+
+        name = match.group(1)
+
+        if name in {
+            "if",
+            "for",
+            "while",
+            "switch",
+            "catch",
+            "constructor",
+        }:
+            continue
+
+        end_index = _find_matching_brace(
+            lines,
+            index,
+        )
+
+        if end_index is None:
+            continue
+
+        if chunk_type == "method" and current_class:
+            chunk_name = f"{current_class}.{name}"
+        else:
+            chunk_name = name
+
+        chunks.append(
+            _build_generic_chunk(
+                chunk_name,
+                chunk_type,
+                lines,
+                index,
+                end_index,
+            )
+        )
+
+    return chunks
+
+def chunk_generic_code_file(
+    file_path,
+    max_chunk_size=2048,
+):
+    """
+    Divide código no-Python en fragmentos genéricos.
+
+    Intenta respetar líneas completas y evita
+    enviar archivos enteros al contexto.
+    """
+
+    file_path = Path(file_path).resolve()
+
+    if not file_path.is_file():
+        return [], f"File not found: {file_path}"
+
+    try:
+        content = file_path.read_text(
+            encoding="utf-8"
+        )
+    except (OSError, UnicodeDecodeError) as error:
+        return [], f"Could not read file: {error}"
+
+    lines = content.splitlines()
+
+    if not lines:
+        return [], None
+
+    extension = file_path.suffix.lower()
+
+    semantic_chunks = []
+
+    if extension == ".java":
+        semantic_chunks = _chunk_java_file(
+            lines
+        )
+
+    elif extension in {
+        ".js",
+        ".jsx",
+        ".ts",
+        ".tsx",
+    }:
+        semantic_chunks = _chunk_javascript_file(
+            lines
+        )
+
+    if semantic_chunks:
+        return semantic_chunks, None
+
+    chunks = []
+    current_lines = []
+    current_size = 0
+    start_line = 1
+
+    for line_number, line in enumerate(
+        lines,
+        start=1,
+    ):
+        line_with_newline = line + "\n"
+        line_size = len(
+            line_with_newline.encode("utf-8")
+        )
+
+        if (
+            current_lines
+            and current_size + line_size
+            > max_chunk_size
+        ):
+            chunk_content = "\n".join(
+                current_lines
+            )
+
+            chunks.append(
+                {
+                    "name": (
+                        f"lines_{start_line}_"
+                        f"{line_number - 1}"
+                    ),
+                    "type": "code",
+                    "start_line": start_line,
+                    "end_line": line_number - 1,
+                    "content": chunk_content,
+                    "size": len(
+                        chunk_content.encode(
+                            "utf-8"
+                        )
+                    ),
+                }
+            )
+
+            current_lines = []
+            current_size = 0
+            start_line = line_number
+
+        current_lines.append(line)
+        current_size += line_size
+
+    if current_lines:
+        chunk_content = "\n".join(
+            current_lines
+        )
+
+        chunks.append(
+            {
+                "name": (
+                    f"lines_{start_line}_"
+                    f"{len(lines)}"
+                ),
+                "type": "code",
+                "start_line": start_line,
+                "end_line": len(lines),
+                "content": chunk_content,
+                "size": len(
+                    chunk_content.encode(
+                        "utf-8"
+                    )
+                ),
+            }
+        )
+
+    return chunks, None
+
 def _tokenize_text(text):
-    """Normaliza texto en términos útiles para búsqueda."""
+    """Convierte texto y nombres de código en tokens."""
 
-    text = text.lower().replace("_", " ")
+    if not text:
+        return set()
 
-    words = re.findall(
-        r"[a-zA-Záéíóúñ][a-zA-Z0-9áéíóúñ]*",
+    normalized = re.sub(
+        r"([a-z0-9])([A-Z])",
+        r"\1 \2",
         text,
     )
 
-    normalized = set()
+    normalized = re.sub(
+        r"[_\-.\\/]+",
+        " ",
+        normalized,
+    )
+
+    words = re.findall(
+        r"[A-Za-zÀ-ÿ0-9]+",
+        normalized.lower(),
+    )
+
+    tokens = set(words)
 
     for word in words:
-        if word in STOP_WORDS:
-            continue
+        if len(word) > 4:
+            if word.endswith("ar"):
+                tokens.add(word[:-2])
 
-        word = TERM_ALIASES.get(
-            word,
-            word,
-        )
+            elif word.endswith("er"):
+                tokens.add(word[:-2])
 
-        normalized.add(word)
+            elif word.endswith("ir"):
+                tokens.add(word[:-2])
 
-    return normalized
+    return tokens
+
+def _words_match(left, right):
+    """Compara tokens exactos o con una raíz común."""
+
+    if left == right:
+        return True
+
+    if len(left) < 5 or len(right) < 5:
+        return False
+
+    # Coincidencia por prefijo directo.
+    if (
+        left.startswith(right)
+        or right.startswith(left)
+    ):
+        return True
+
+    # Coincidencia por raíz común.
+    common_length = 0
+
+    for left_char, right_char in zip(left, right):
+        if left_char != right_char:
+            break
+
+        common_length += 1
+
+    minimum_length = min(
+        len(left),
+        len(right),
+    )
+
+    return (
+        common_length >= 4
+        and common_length >= minimum_length - 1
+    )
 
 def _score_chunk(chunk, query_words):
     """Calcula la relevancia de un chunk para una consulta."""
@@ -366,13 +863,39 @@ def _score_chunk(chunk, query_words):
 
     score = 0
 
-    # Las coincidencias en el nombre son especialmente relevantes.
-    score += len(query_words & name_words) * 5
+    # Coincidencias exactas en el nombre.
+    exact_name_matches = query_words & name_words
+    score += len(exact_name_matches) * 5
 
-    # Coincidencias dentro del código.
-    score += len(query_words & content_words)
+    # Coincidencias aproximadas en el nombre.
+    for query_word in query_words:
+        if query_word in exact_name_matches:
+            continue
 
-    # Los imports son baratos y muy útiles para entender relaciones.
+        if any(
+            _words_match(query_word, name_word)
+            for name_word in name_words
+        ):
+            score += 3
+
+    # Coincidencias exactas dentro del código.
+    exact_content_matches = (
+        query_words & content_words
+    )
+    score += len(exact_content_matches)
+
+    # Coincidencias aproximadas dentro del código.
+    for query_word in query_words:
+        if query_word in exact_content_matches:
+            continue
+
+        if any(
+            _words_match(query_word, content_word)
+            for content_word in content_words
+        ):
+            score += 1
+
+    # Los imports son baratos y útiles para entender relaciones.
     if chunk["type"] == "imports":
         score += 3
 
@@ -461,6 +984,18 @@ def select_global_chunks(
                 chunk,
                 query_words,
             )
+            file_words = _tokenize_text(
+                file_name
+            )
+
+            score += len(
+                query_words & file_words
+            ) * 5
+
+            if score <= 0:
+                continue
+
+            
 
             if score <= 0:
                 continue
@@ -623,6 +1158,8 @@ def get_dependency_context(
 
         if not content:
             continue
+        if Path(file_name).suffix.lower() != ".py":
+            continue
 
         imports_by_module = (
             extract_imports_by_module(content)
@@ -652,3 +1189,75 @@ def get_dependency_context(
                 )
 
     return dependency_context
+
+PYTHON_EXTENSIONS = {
+    ".py",
+}
+
+GENERIC_CODE_EXTENSIONS = {
+    ".java",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".cs",
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".cc",
+    ".go",
+    ".rs",
+    ".php",
+    ".kt",
+    ".kts",
+    ".swift",
+    ".rb",
+    ".sh",
+    ".fish",
+}
+
+
+def chunk_code_file(file_path):
+    """
+    Selecciona el chunker apropiado según
+    el lenguaje del archivo.
+
+    Python utiliza el AST nativo.
+    Los lenguajes compatibles utilizan Tree-sitter.
+    Si Tree-sitter no puede generar chunks,
+    se utiliza el chunker genérico como fallback.
+    """
+
+    file_path = Path(file_path)
+    extension = file_path.suffix.lower()
+
+    if extension in PYTHON_EXTENSIONS:
+        return chunk_python_file(file_path)
+
+    tree_sitter_language = get_language_for_file(
+        file_path
+    )
+
+    if tree_sitter_language is not None:
+        chunks, error = extract_code_chunks(
+            file_path
+        )
+
+        if chunks:
+            return chunks, None
+
+        if error is None:
+            return chunk_generic_code_file(
+                file_path
+            )
+
+    if extension in GENERIC_CODE_EXTENSIONS:
+        return chunk_generic_code_file(
+            file_path
+        )
+
+    return [], (
+        f"Unsupported code file: "
+        f"{file_path.name}"
+    )
